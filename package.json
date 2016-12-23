@@ -1,0 +1,30 @@
+{
+  "name": "xdssurl",
+  "version": "1.0.0",
+  "description": "URL Shortener task in freecodecamp",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xdsnet/xdsurl.git"
+  },
+  "keywords": [
+    "express"
+  ],
+  "author": "xdsnet",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/xdsnet/xdsurl/issues"
+  },
+  "homepage": "https://github.com/xdsnet/xdsurl#readme",
+  "dependencies": {
+    "dotenv": "^2.0.0",
+    "ejs": "^2.5.5",
+    "express": "^4.14.0",
+    "pg": "6.1.2",
+    "valid-url": "^1.0.9"
+  }
+}

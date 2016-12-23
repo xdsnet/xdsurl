@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>URL Shortener microservice</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+</head>
+    <body>
+        <div class="container">
+            <h1 class="header">
+                API基本调用: URL跳转服务(URL Shortener microservice)
+            </h1>
+            <blockquote>
+                使用场景:
+                <ul>调用接口<code>new/&lt;A URL&gt;</code>调用服务,将把该地址存储在服务中，并提供一个转换的跳转短地址。</ul>
+                <ul>访问<code>/&lt;Number&gt;</code>，（Number是存储的序号）,将跳转到对应的地址中。</ul>
+            </blockquote>
+            <h3>调用样例1:</h3>
+            <code><%=serverHost %>new/http://freecodecamp.com/news</code>
+            <h3>样例输出:</h3>
+            <code>
+                { "original_url": "http://freecodecamp.com/news", "short_url": "<%=serverHost %>4" } 
+            </code>
+            <hr/>
+            <h3>调用样例2:</h3>
+            <code><%=serverHost %>4</code>
+            
+            将跳转到<code>
+                "http://freecodecamp.com/news"
+            </code>
+        </div>
+</body>
+</html>
