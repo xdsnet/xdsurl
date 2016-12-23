@@ -1,6 +1,7 @@
 
 var express = require("express");
 var fs = require('fs');
+var pg=require('pg');
 var read = fs.readFileSync;
 var ejs = require("ejs");
 var validUrl = require('valid-url');
@@ -9,110 +10,105 @@ var rt={};
 var errobj={};
 
 require('dotenv').load();
-var conString = process.env.DATABASE_URL;
-var pg_exec = require("./dbconfig.js").pg_exec(conString);
+pg.defaults.ssl = true; // 对于heroku时必须要，注意取消注释
+var conString = process.env.DATABASE_URL; // 定义数据库连接
 
 app.get("/",function(req,res){ // 对 / 的处理
-    var serverHost=req.protocol+"://"+req.host+"/"
-    var noRestStr= ejs.render(read("root.ejs","utf-8"),{serverHost:serverHost});
+    let serverHost=req.protocol+"://"+req.host+"/"
+    let noRestStr= ejs.render(read("root.ejs","utf-8"),{serverHost:serverHost});
         res.end(noRestStr)
 });
 
 app.get(/^\/\d+$/,function(req,res){ // 对 /<数字> 的处理
-    var allPath = decodeURI(req.path) //解码出查询数据
-    var sid = allPath.replace(/^\//,""); // 获取到实际查询数据
-    var sidNum = parseInt(sid);
+    let allPath = decodeURI(req.path) //解码出查询数据
+    let sidStr = allPath.replace(/^\//,""); // 获取到实际查询数据
+    let sidNum = parseInt(sidStr);
     console.log("setep1:"+sidNum);
-    pg_exec({
-            name:"select",
-            text:"SELECT sid,url FROM xdssurl WHERE sid=$1::int",
-            values:[sidNum]},
-        function(err,result){
-            if(err){
-                console.log("ERR2-:"+err);
+    let Qstr="SELECT sid,url FROM xdssurl WHERE sid="+sidNum+";";
+    let pgclient=new pg.Client(conString);
+    pgclient.connect(function(err){
+        if(err){
+            console.log("数据库连接出错1:"+JSON.stringify(err));
+            res.end("数据库连接出错1");
+        }
+        pgclient.query(Qstr,function(e,dbrt){
+            pgclient.end();// 无论是否有错误，先中断数据库连接
+            if(e){
+                console.log("数据库查询出错1:"+JSON.stringify(e));
+                errobj["error"]="数据库查询出错1"
+                res.end(JSON.stringify(errobj),"utf-8");
                 return;
             }
-            if(result.rowCount>0){
-                let url=result.rows[0]["url"];
+            if(dbrt.rowCount>0){
+                let url=dbrt.rows[0]["url"];
                 console.log("需要重定向到"+url);
                 res.redirect(url);
                 return;
             }else{
                 errobj["error"]="传入的短地址没有定义"
-                console.log("输出错误信息2");
+                console.log("传入的短地址没有定义");
                 res.end(JSON.stringify(errobj),"utf-8");
                 return;
             }
-        }
-    );
+        });
+    });
 });
 
 app.get("/new/*",function(req,res){
-    var allPath = decodeURI(req.path) //解码出查询数据
-    var serverHost=req.protocol+"://"+req.host+"/"
+    let allPath = decodeURI(req.path) //解码出查询数据
+    let serverHost=req.protocol+"://"+req.host+"/"
     if (allPath==="/new/"){
-        var noRestStr= ejs.render(read("root.ejs","utf-8"),{serverHost:serverHost});
+        let noRestStr= ejs.render(read("root.ejs","utf-8"),{serverHost:serverHost});
         res.end(noRestStr)
     }else{  
-        let url = allPath.replace(/^\/new\//,""); // 获取到实际查询数据
-        if (validUrl.isUri(url)){ // url 是有效的url
+        let urlStr = allPath.replace(/^\/new\//,""); // 获取到实际查询数据
+        if (validUrl.isUri(urlStr)){ // url 是有效的url
             console.log("setep2");
-            let qtext="SELECT sid,url FROM xdssurl WHERE url='"+url+"'";
-            pg_exec({ //尝试插入
-                    name:"insert",
-                    text:"INSERT INTO xdssurl (url) VALUES($1::text)",
-                    values:[url]
+            let Istr="INSERT INTO xdssurl (url) VALUES('"+urlStr+"')";
+            let Qstr="SELECT sid,url FROM xdssurl WHERE url='"+urlStr+"'";
+            let pgclient=new pg.Client(conString);
+            pgclient.connect(function(err){
+                if(err){
+                    console.log("数据库连接出错2:"+JSON.stringify(err));
+                    errobj["error"]="数据库连接出错2"
+                    res.end(JSON.stringify(errobj),"utf-8");
+                    return;
                 }
-                ,function(err){
-                    if(err){
-                        if(err.code==23505){ // 数据已经插入过的错误，仅仅记录不处理
-                            console.log(url+"已经记录过");
-                        }else{ // 其他数据库错误，输出情况并停止后续处理
-                            console.log(url+"其他数据库错误");
-                            errobj["error"]="数据库错误0"
-                            console.log("数据库错误0");
-                            res.end(JSON.stringify(errobj),"utf-8");
-                            return;
+                pgclient.query(Istr,function(e){
+                    if(e){
+                        if(e.code==23505){
+                            console.log("已存在URL:"+urlStr);
+                        }else{
+                            console.log("插入数据是有错误:"+JSON.stringify(e));
                         }
+                        return;
                     }
-                    console.log("setep3+"+url);
-                    console.log(qtext);
-                    let tmpQObj={name:"select",
-                        text:qtext,
-                        value:[]
-                        }
-                    pg_exec(tmpQObj
-                        ,function(err2,result1){
-                            if(err2){
-                                console.log("err3:"+JSON.stringify(err2));
-                                errobj["error"]="数据库错误1"
-                                console.log("数据库错误1");
-                                res.end(JSON.stringify(errobj),"utf-8");
-                                return;
-                            }
-                            //console.log(JSON.stringify(result1));
-                            if(result1.rowCount>0){
-                                let rt={};
-                                console.log(JSON.stringify(result1));
-                                rt["original_url"]=result1.rows[0]["url"];
-                                rt["short_url"]=serverHost+result1.rows[0]["sid"];
-                                console.log(JSON.stringify(result1.rows));
-                                res.end(JSON.stringify(rt),"utf-8")
-                                return;
-                            }else{
-                                errobj["error"]="数据库错误1"
-                                console.log("数据库错误1");
-                                res.end(JSON.stringify(errobj),"utf-8");
-                                return;
-                            }
-                        }
-                    );
-                    tmpQObj={}
-                }
-            );
-            
+                });
+                pgclient.query(Qstr,function(e,dbrt){
+                    pgclient.end();// 无论是否有错误，先中断数据库连接
+                    if(e){
+                        console.log("数据库查询出错2:"+JSON.stringify(e));
+                        errobj["error"]="数据库查询出错2"
+                        res.end(JSON.stringify(errobj),"utf-8");
+                        return;
+                    }
+                    if(dbrt.rowCount>0){
+                        //console.log(JSON.stringify(dbrt));
+                        rt["original_url"]=dbrt.rows[0]["url"];
+                        rt["short_url"]=serverHost+dbrt.rows[0]["sid"];
+                        console.log(JSON.stringify(dbrt.rows));
+                        res.end(JSON.stringify(rt),"utf-8")
+                        return;
+                    }else{
+                        errobj["error"]="数据库错误3"
+                        console.log("数据库错误3");
+                        res.end(JSON.stringify(errobj),"utf-8");
+                        return;
+                    }
+                });
+            });
         }else{ // 不是有效的url
-            errobj["error"]="传入的短地址不是有效的URL"
+            errobj["error"]="传入的URL地址不是有效的URL"
             console.log("输出错误信息0");
             res.end(JSON.stringify(errobj),"utf-8");
         }
